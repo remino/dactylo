@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../../../components/BaseLayout.astro'
+import { site } from '../../../data/site'
+---
+
+<BaseLayout title="Demo" description={site.description} path="/dactylo/demo/">
+	<main>
+		<p>
+			Dactylo walks through text one character at a time. JavaScript finds the
+			text; CSS reveals it.
+		</p>
+		<p>
+			Install it with <code>npm install dactylo</code>, then import
+			<code>dactylo/auto</code> or call <code>dactylo()</code> yourself.
+		</p>
+
+		<h2>Default</h2>
+		<p>
+			The default auto entrypoint applies the effect to headings, paragraphs,
+			lists, links, buttons, tables, and other ordinary text-bearing elements.
+		</p>
+
+		<h2>Lists</h2>
+		<ul>
+			<li>Every line keeps its natural markup.</li>
+			<li>Whitespace is preserved where the browser would preserve it.</li>
+			<li>Reduced motion preferences disable the animation.</li>
+		</ul>
+
+		<h2>Controls</h2>
+		<p class="demo-controls" data-dactylo-skip>
+			<button type="button" data-demo-action="again">Run again</button>
+			<button type="button" data-demo-action="slow">Slow</button>
+			<button type="button" data-demo-action="fast">Fast</button>
+		</p>
+
+		<p data-demo-target>
+			This paragraph is controlled by the buttons. It can be reset and animated
+			again with different character delays.
+		</p>
+
+		<h2>Manual Target</h2>
+		<pre><code>import &lbrace; dactylo &rbrace; from 'dactylo'
+
+dactylo(document.querySelector('main'), &lbrace; delay: 24 &rbrace;)</code></pre>
+	</main>
+
+	<script slot="scripts">
+		let controller
+		const target = document.querySelector('[data-demo-target]')
+
+		const run = delay => {
+			controller?.reset()
+			window.resetDactylo?.(target)
+			controller = window.dactylo?.({
+				root: target,
+				groups: [
+					{
+						sels: '[data-demo-target]',
+						interval: delay,
+					},
+				],
+				startDelay: 0,
+			})
+		}
+
+		document
+			.querySelector('[data-demo-action="again"]')
+			?.addEventListener('click', () => run(18))
+		document
+			.querySelector('[data-demo-action="slow"]')
+			?.addEventListener('click', () => run(45))
+		document
+			.querySelector('[data-demo-action="fast"]')
+			?.addEventListener('click', () => run(5))
+	</script>
+</BaseLayout>

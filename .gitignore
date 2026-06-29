@@ -1,0 +1,5 @@
+.astro
+.build
+.env
+/deploy
+/node_modules

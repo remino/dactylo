@@ -1,0 +1,39 @@
+@import '@remino/directive';
+
+@font-face {
+	font-display: swap;
+	font-family: 'Iosevka Term';
+	font-style: normal;
+	font-weight: 400;
+	src: url('/fonts/IosevkaTerm-Regular.woff2') format('woff2');
+}
+
+@font-face {
+	font-display: swap;
+	font-family: 'Iosevka Term';
+	font-style: normal;
+	font-weight: 700;
+	src: url('/fonts/IosevkaTerm-Bold.woff2') format('woff2');
+}
+
+:root {
+	--dactylo-ff:
+		'Iosevka Term', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+	--dress-ff-mono: var(--dactylo-ff);
+	--dress-ff-sans: var(--dactylo-ff);
+}
+
+main {
+	margin-block-end: var(--rmn-ribbon-push, 0px);
+}
+
+article mark,
+header h1 {
+	text-transform: lowercase;
+}
+
+.demo-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
