@@ -9,6 +9,9 @@
 
 ## HEAD
 
+- Site
+    - Use the shared copy button helper without local fallback behavior.
+    - Wrap Markdown code blocks and add copy buttons to them.
 - Library
     - Hide the caret on the final typed character by default, with a
       `showFinalCaret` option to keep it visible.

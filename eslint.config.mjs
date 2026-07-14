@@ -34,6 +34,12 @@ export default [
 		},
 	},
 	{
+		files: ['src/assets/js/**/*.js'],
+		languageOptions: {
+			globals: globals.browser,
+		},
+	},
+	{
 		files: ['spec/**/*.js'],
 		languageOptions: {
 			globals: globals.jasmine,
