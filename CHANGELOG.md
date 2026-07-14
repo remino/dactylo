@@ -3,11 +3,14 @@
 <!-- mtoc-start -->
 
 - [HEAD](#head)
+- [v0.2.0](#v020)
 - [v0.1.0](#v010)
 
 <!-- mtoc-end -->
 
 ## HEAD
+
+## v0.2.0
 
 - Site
     - Use the shared copy button helper without local fallback behavior.
