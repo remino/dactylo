@@ -57,7 +57,7 @@ var wait = (duration, state) => new Promise((resolve) => {
 	const started = Date.now();
 	const tick = () => {
 		const elapsed = Date.now() - started - getPausedDuration(state);
-		if (state.stopped || elapsed >= duration) {
+		if (state.ended || state.stopped || elapsed >= duration) {
 			resolve();
 			return;
 		}
@@ -164,12 +164,13 @@ var typeElement = (prepared, group, options, state) => new Promise((resolve) => 
 });
 var showPrompt = async (first, options, state) => {
 	if (!first) return;
+	if (activeElements.get(first.element)?.id !== first.id || state.ended || state.stopped) return;
 	const prompt = createOutput(first.element.ownerDocument, options.caret);
 	prompt.textContent = options.prompt;
 	first.element.append(prompt);
 	first.element.classList.add("dactylo--caret");
 	await wait(options.startDelay, state);
-	if (activeElements.get(first.element)?.id !== first.id || state.stopped) return;
+	if (activeElements.get(first.element)?.id !== first.id || state.ended || state.stopped) return;
 	prompt.remove();
 	first.element.classList.remove("dactylo--caret");
 };
@@ -316,7 +317,8 @@ var dactylo = (rootOrOptions, maybeOptions = {}) => {
 				delegate.end();
 				return;
 			}
-			if (playback.ended || playback.stopped) {
+			if (playback.ended) return;
+			if (playback.stopped) {
 				delegate = dactylo(targetRoot, options);
 				delegate.end();
 				return;

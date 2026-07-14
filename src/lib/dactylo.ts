@@ -132,7 +132,7 @@ const wait = (duration: number, state: PlaybackState): Promise<void> =>
 		const tick = (): void => {
 			const elapsed = Date.now() - started - getPausedDuration(state)
 
-			if (state.stopped || elapsed >= duration) {
+			if (state.ended || state.stopped || elapsed >= duration) {
 				resolve()
 				return
 			}
@@ -317,6 +317,12 @@ const showPrompt = async (
 	state: PlaybackState
 ): Promise<void> => {
 	if (!first) return
+	if (
+		activeElements.get(first.element)?.id !== first.id ||
+		state.ended ||
+		state.stopped
+	)
+		return
 
 	const prompt = createOutput(first.element.ownerDocument, options.caret)
 
@@ -326,7 +332,11 @@ const showPrompt = async (
 
 	await wait(options.startDelay, state)
 
-	if (activeElements.get(first.element)?.id !== first.id || state.stopped)
+	if (
+		activeElements.get(first.element)?.id !== first.id ||
+		state.ended ||
+		state.stopped
+	)
 		return
 
 	prompt.remove()
@@ -573,7 +583,9 @@ export const dactylo = (
 				return
 			}
 
-			if (playback.ended || playback.stopped) {
+			if (playback.ended) return
+
+			if (playback.stopped) {
 				delegate = dactylo(targetRoot, options)
 				delegate.end()
 				return

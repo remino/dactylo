@@ -17,6 +17,7 @@
     - Add `state`, `pause()`, `play()`, `playPause()`, `end()`, `reset()`, and
       `stop()` to Dactylo controllers.
     - Emit lifecycle and playback events with controller state details.
+    - Prevent `end()` from adding a prompt caret after an animation has ended.
     - Make controller `reset()` and `stop()` return text to its hidden starting
       state instead of restoring the finished text.
     - Allow `play()` after `reset()` or `stop()` to start the target again.
