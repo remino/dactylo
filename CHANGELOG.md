@@ -9,6 +9,9 @@
 
 ## HEAD
 
+- Library
+    - Prevent quick Dactylo restarts from nesting output fragments or restoring
+      stale text.
 - Development
     - Add Husky, lint-staged, changelog helpers, and release-it scripts.
 

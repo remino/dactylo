@@ -46,9 +46,19 @@ export interface DactyloController {
 
 interface PreparedElement {
 	element: HTMLElement
+	id: number
 	original: HTMLElement
 	originalHtml: string
 }
+
+interface ActiveElement {
+	id: number
+	originalHtml: string
+}
+
+const activeElements = new WeakMap<HTMLElement, ActiveElement>()
+let nextPreparedId = 0
+let activeRunId = 0
 
 const getRoot = (root?: ParentNode): ParentNode | null =>
 	root ?? globalThis.document?.body ?? null
@@ -118,19 +128,29 @@ const prepareElement = (element: HTMLElement): PreparedElement => {
 	const document = element.ownerDocument
 	const original = document.createElement('span')
 	const originalHtml = element.innerHTML
+	const id = ++nextPreparedId
 
 	element.classList.add('dactylo--typing')
 	original.classList.add('dactylo__original')
 	original.dataset.dactyloOriginal = ''
 	original.innerHTML = originalHtml
 	element.replaceChildren(original)
+	activeElements.set(element, { id, originalHtml })
 
-	return { element, original, originalHtml }
+	return { element, id, original, originalHtml }
 }
 
-const restoreElement = ({ element, originalHtml }: PreparedElement): void => {
+const restoreElement = ({
+	element,
+	id,
+	originalHtml,
+}: PreparedElement): void => {
+	const active = activeElements.get(element)
+	if (!active || active.id !== id) return
+
 	element.innerHTML = originalHtml
 	element.classList.remove('dactylo--typing', 'dactylo--caret')
+	activeElements.delete(element)
 }
 
 const step = (
@@ -140,6 +160,9 @@ const step = (
 	prepared: PreparedElement,
 	output: HTMLElement
 ): boolean => {
+	const active = activeElements.get(prepared.element)
+	if (!active || active.id !== prepared.id) return false
+
 	const elapsed = Date.now() - started
 	const progress = elapsed / duration
 	const pointer =
@@ -168,6 +191,11 @@ const typeElement = (
 				: chars.length * group.interval
 		const output = createOutput(prepared.element.ownerDocument, options.caret)
 
+		if (activeElements.get(prepared.element)?.id !== prepared.id) {
+			resolve()
+			return
+		}
+
 		prepared.element.append(output)
 
 		const nextStep = (): void => {
@@ -195,6 +223,8 @@ const showPrompt = async (
 	first.element.classList.add('dactylo--caret')
 
 	await wait(options.startDelay)
+
+	if (activeElements.get(first.element)?.id !== first.id) return
 
 	prompt.remove()
 	first.element.classList.remove('dactylo--caret')
@@ -275,14 +305,26 @@ export const resetDactylo = (root?: ParentNode): void => {
 	const targetRoot = getRoot(root)
 	if (!targetRoot) return
 
-	for (const element of Array.from(
-		targetRoot.querySelectorAll<HTMLElement>('.dactylo--typing')
-	)) {
+	const rootElement =
+		globalThis.HTMLElement &&
+		targetRoot instanceof HTMLElement &&
+		targetRoot.classList.contains('dactylo--typing')
+			? [targetRoot]
+			: []
+	const elements = [
+		...rootElement,
+		...Array.from(targetRoot.querySelectorAll<HTMLElement>('.dactylo--typing')),
+	]
+
+	for (const element of elements) {
+		const active = activeElements.get(element)
 		const original = element.querySelector<HTMLElement>(
 			'[data-dactylo-original]'
 		)
-		element.innerHTML = original?.innerHTML ?? element.innerHTML
+		element.innerHTML =
+			active?.originalHtml ?? original?.innerHTML ?? element.innerHTML
 		element.classList.remove('dactylo--typing', 'dactylo--caret')
+		activeElements.delete(element)
 	}
 }
 
@@ -304,15 +346,6 @@ export const dactylo = (
 	const caret = options.caret ?? DEFAULT_CARET
 	const prompt = options.prompt ?? DEFAULT_PROMPT
 	const startDelay = options.startDelay ?? DEFAULT_START_DELAY
-	const selected = targetRoot
-		? groups.flatMap(group =>
-				selectElements(targetRoot, group.sels, group.notIn)
-			)
-		: []
-	const elements = [...new Set(selected)]
-	const prepared = new Map(
-		elements.map(element => [element, prepareElement(element)])
-	)
 
 	if (!document || !targetRoot) {
 		return {
@@ -322,6 +355,17 @@ export const dactylo = (
 			reset: () => undefined,
 		}
 	}
+
+	resetDactylo(targetRoot)
+
+	const selected = groups.flatMap(group =>
+		selectElements(targetRoot, group.sels, group.notIn)
+	)
+	const elements = [...new Set(selected)]
+	const prepared = new Map(
+		elements.map(element => [element, prepareElement(element)])
+	)
+	const runId = ++activeRunId
 
 	injectDactyloStyles(document)
 	document.documentElement.classList.remove('dactylo--end')
@@ -335,6 +379,8 @@ export const dactylo = (
 			group => () => runGroup(group, targetRoot, prepared, { caret })
 		),
 	]).then(() => {
+		if (activeRunId !== runId) return
+
 		document.documentElement.classList.remove('dactylo--active')
 		document.documentElement.classList.add('dactylo--end')
 		dispatchEvent('dactylo:end', document.documentElement)
@@ -344,6 +390,9 @@ export const dactylo = (
 		elements,
 		finished,
 		root: targetRoot,
-		reset: () => resetDactylo(targetRoot),
+		reset: () => {
+			if (activeRunId === runId) activeRunId += 1
+			resetDactylo(targetRoot)
+		},
 	}
 }

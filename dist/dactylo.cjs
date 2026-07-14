@@ -22,6 +22,9 @@ var DEFAULT_CARET = "_";
 var DEFAULT_PROMPT = ">";
 var DEFAULT_START_DELAY = 600;
 var DEFAULT_DURATION = 500;
+var activeElements = /* @__PURE__ */ new WeakMap();
+var nextPreparedId = 0;
+var activeRunId = 0;
 var getRoot = (root) => root ?? globalThis.document?.body ?? null;
 var getDocument = (root) => {
 	if ("ownerDocument" in root && root.ownerDocument) return root.ownerDocument;
@@ -53,22 +56,33 @@ var createOutput = (document, caret) => {
 var prepareElement = (element) => {
 	const original = element.ownerDocument.createElement("span");
 	const originalHtml = element.innerHTML;
+	const id = ++nextPreparedId;
 	element.classList.add("dactylo--typing");
 	original.classList.add("dactylo__original");
 	original.dataset.dactyloOriginal = "";
 	original.innerHTML = originalHtml;
 	element.replaceChildren(original);
+	activeElements.set(element, {
+		id,
+		originalHtml
+	});
 	return {
 		element,
+		id,
 		original,
 		originalHtml
 	};
 };
-var restoreElement = ({ element, originalHtml }) => {
+var restoreElement = ({ element, id, originalHtml }) => {
+	const active = activeElements.get(element);
+	if (!active || active.id !== id) return;
 	element.innerHTML = originalHtml;
 	element.classList.remove("dactylo--typing", "dactylo--caret");
+	activeElements.delete(element);
 };
 var step = (started, duration, chars, prepared, output) => {
+	const active = activeElements.get(prepared.element);
+	if (!active || active.id !== prepared.id) return false;
 	const progress = (Date.now() - started) / duration;
 	const pointer = progress > 1 ? chars.length : Math.floor(progress * chars.length);
 	output.textContent = chars.slice(0, pointer + 1).join("");
@@ -82,6 +96,10 @@ var typeElement = (prepared, group, options) => new Promise((resolve) => {
 	const started = Date.now();
 	const duration = group.interval === void 0 ? group.duration ?? DEFAULT_DURATION : chars.length * group.interval;
 	const output = createOutput(prepared.element.ownerDocument, options.caret);
+	if (activeElements.get(prepared.element)?.id !== prepared.id) {
+		resolve();
+		return;
+	}
 	prepared.element.append(output);
 	const nextStep = () => {
 		if (step(started, duration, chars, prepared, output)) {
@@ -99,6 +117,7 @@ var showPrompt = async (first, options) => {
 	first.element.append(prompt);
 	first.element.classList.add("dactylo--caret");
 	await wait(options.startDelay);
+	if (activeElements.get(first.element)?.id !== first.id) return;
 	prompt.remove();
 	first.element.classList.remove("dactylo--caret");
 };
@@ -164,9 +183,13 @@ var injectDactyloStyles = (document = globalThis.document) => {
 var resetDactylo = (root) => {
 	const targetRoot = getRoot(root);
 	if (!targetRoot) return;
-	for (const element of Array.from(targetRoot.querySelectorAll(".dactylo--typing"))) {
-		element.innerHTML = element.querySelector("[data-dactylo-original]")?.innerHTML ?? element.innerHTML;
+	const elements = [...globalThis.HTMLElement && targetRoot instanceof HTMLElement && targetRoot.classList.contains("dactylo--typing") ? [targetRoot] : [], ...Array.from(targetRoot.querySelectorAll(".dactylo--typing"))];
+	for (const element of elements) {
+		const active = activeElements.get(element);
+		const original = element.querySelector("[data-dactylo-original]");
+		element.innerHTML = active?.originalHtml ?? original?.innerHTML ?? element.innerHTML;
 		element.classList.remove("dactylo--typing", "dactylo--caret");
+		activeElements.delete(element);
 	}
 };
 var dactylo = (rootOrOptions, maybeOptions = {}) => {
@@ -178,15 +201,17 @@ var dactylo = (rootOrOptions, maybeOptions = {}) => {
 	const caret = options.caret ?? DEFAULT_CARET;
 	const prompt = options.prompt ?? DEFAULT_PROMPT;
 	const startDelay = options.startDelay ?? DEFAULT_START_DELAY;
-	const selected = targetRoot ? groups.flatMap((group) => selectElements(targetRoot, group.sels, group.notIn)) : [];
-	const elements = [...new Set(selected)];
-	const prepared = new Map(elements.map((element) => [element, prepareElement(element)]));
 	if (!document || !targetRoot) return {
 		elements: [],
 		finished: Promise.resolve(),
 		root: targetRoot,
 		reset: () => void 0
 	};
+	resetDactylo(targetRoot);
+	const selected = groups.flatMap((group) => selectElements(targetRoot, group.sels, group.notIn));
+	const elements = [...new Set(selected)];
+	const prepared = new Map(elements.map((element) => [element, prepareElement(element)]));
+	const runId = ++activeRunId;
 	injectDactyloStyles(document);
 	document.documentElement.classList.remove("dactylo--end");
 	document.documentElement.classList.add("dactylo--active");
@@ -198,12 +223,16 @@ var dactylo = (rootOrOptions, maybeOptions = {}) => {
 			prompt,
 			startDelay
 		}), ...groups.map((group) => () => runGroup(group, targetRoot, prepared, { caret }))]).then(() => {
+			if (activeRunId !== runId) return;
 			document.documentElement.classList.remove("dactylo--active");
 			document.documentElement.classList.add("dactylo--end");
 			dispatchEvent("dactylo:end", document.documentElement);
 		}),
 		root: targetRoot,
-		reset: () => resetDactylo(targetRoot)
+		reset: () => {
+			if (activeRunId === runId) activeRunId += 1;
+			resetDactylo(targetRoot);
+		}
 	};
 };
 //#endregion
