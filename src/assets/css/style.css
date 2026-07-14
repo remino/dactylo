@@ -70,7 +70,16 @@ header h1 {
 }
 
 .demo-controls {
+	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.75rem;
+	gap: calc(var(--dress-m-b) / 2) calc(var(--dress-p-i) / 2);
+	list-style: none;
+	padding-inline: 0;
+
+	button,
+	li,
+	output {
+		margin: 0;
+	}
 }

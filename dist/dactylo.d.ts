@@ -13,11 +13,18 @@ export interface DactyloOptions {
     showFinalCaret?: boolean;
     startDelay?: number;
 }
+export type DactyloState = 'ended' | 'paused' | 'playing' | 'stopped';
 export interface DactyloController {
     elements: HTMLElement[];
+    end: () => void;
     finished: Promise<void>;
+    pause: () => void;
+    play: () => void;
+    playPause: () => void;
     root: ParentNode | null;
     reset: () => void;
+    readonly state: DactyloState;
+    stop: () => void;
 }
 export declare const injectDactyloStyles: (document?: Document) => void;
 export declare const resetDactylo: (root?: ParentNode) => void;

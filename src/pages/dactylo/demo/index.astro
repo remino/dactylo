@@ -28,11 +28,20 @@ import { site } from '../../../data/site'
 		</ul>
 
 		<h2>Controls</h2>
-		<p class="demo-controls" data-dactylo-skip>
-			<button type="button" data-demo-action="again">Run again</button>
-			<button type="button" data-demo-action="slow">Slow</button>
-			<button type="button" data-demo-action="fast">Fast</button>
-		</p>
+		<menu class="demo-controls" data-dactylo-skip>
+			<li><button type="button" data-demo-action="again">Run again</button></li>
+			<li><button type="button" data-demo-action="slow">Slow</button></li>
+			<li><button type="button" data-demo-action="fast">Fast</button></li>
+			<li>
+				<button type="button" data-demo-action="play-pause">Play/Pause</button>
+			</li>
+			<li><button type="button" data-demo-action="pause">Pause</button></li>
+			<li><button type="button" data-demo-action="play">Play</button></li>
+			<li><button type="button" data-demo-action="end">End</button></li>
+			<li><button type="button" data-demo-action="stop">Stop</button></li>
+			<li><button type="button" data-demo-action="reset">Reset</button></li>
+			<li><output data-demo-state>stopped</output></li>
+		</menu>
 
 		<p data-demo-target>
 			This paragraph is controlled by the buttons. It can be reset and animated
@@ -48,11 +57,18 @@ dactylo(document.querySelector('main'), &lbrace; delay: 24 &rbrace;)</code></pre
 	<script slot="scripts">
 		let controller
 		const target = document.querySelector('[data-demo-target]')
+		const state = document.querySelector('[data-demo-state]')
+
+		const updateState = () => {
+			if (state) state.textContent = controller?.state ?? 'stopped'
+		}
+
+		window.setInterval(updateState, 100)
 
 		const run = delay => {
 			controller?.reset()
 			window.resetDactylo?.(target)
-			controller = window.dactylo?.({
+			const nextController = window.dactylo?.({
 				root: target,
 				groups: [
 					{
@@ -61,6 +77,12 @@ dactylo(document.querySelector('main'), &lbrace; delay: 24 &rbrace;)</code></pre
 					},
 				],
 				startDelay: 0,
+			})
+
+			controller = nextController
+			updateState()
+			nextController?.finished.then(() => {
+				if (controller === nextController) updateState()
 			})
 		}
 
@@ -73,5 +95,41 @@ dactylo(document.querySelector('main'), &lbrace; delay: 24 &rbrace;)</code></pre
 		document
 			.querySelector('[data-demo-action="fast"]')
 			?.addEventListener('click', () => run(5))
+		document
+			.querySelector('[data-demo-action="play-pause"]')
+			?.addEventListener('click', () => {
+				controller?.playPause()
+				updateState()
+			})
+		document
+			.querySelector('[data-demo-action="pause"]')
+			?.addEventListener('click', () => {
+				controller?.pause()
+				updateState()
+			})
+		document
+			.querySelector('[data-demo-action="play"]')
+			?.addEventListener('click', () => {
+				controller?.play()
+				updateState()
+			})
+		document
+			.querySelector('[data-demo-action="end"]')
+			?.addEventListener('click', () => {
+				controller?.end()
+				updateState()
+			})
+		document
+			.querySelector('[data-demo-action="stop"]')
+			?.addEventListener('click', () => {
+				controller?.stop()
+				updateState()
+			})
+		document
+			.querySelector('[data-demo-action="reset"]')
+			?.addEventListener('click', () => {
+				controller?.reset()
+				updateState()
+			})
 	</script>
 </BaseLayout>

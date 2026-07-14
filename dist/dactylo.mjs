@@ -32,12 +32,51 @@ var getDocument = (root) => {
 	return globalThis.document ?? null;
 };
 var toSelector = (selectors) => Array.isArray(selectors) ? selectors.join(",") : selectors;
-var wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
+var createPlaybackState = () => ({
+	ended: false,
+	paused: false,
+	pausedDuration: 0,
+	pausedStarted: 0,
+	stopped: false
+});
+var getPausedDuration = (state) => state.paused ? state.pausedDuration + Date.now() - state.pausedStarted : state.pausedDuration;
+var pausePlayback = (state) => {
+	if (state.ended || state.paused || state.stopped) return false;
+	state.paused = true;
+	state.pausedStarted = Date.now();
+	return true;
+};
+var playPlayback = (state) => {
+	if (!state.paused || state.ended || state.stopped) return false;
+	state.paused = false;
+	state.pausedDuration += Date.now() - state.pausedStarted;
+	state.pausedStarted = 0;
+	return true;
+};
+var wait = (duration, state) => new Promise((resolve) => {
+	const started = Date.now();
+	const tick = () => {
+		const elapsed = Date.now() - started - getPausedDuration(state);
+		if (state.stopped || elapsed >= duration) {
+			resolve();
+			return;
+		}
+		requestAnimationFrame(tick);
+	};
+	requestAnimationFrame(tick);
+});
+var getPlaybackState = (state) => {
+	if (state.stopped) return "stopped";
+	if (state.ended) return "ended";
+	if (state.paused) return "paused";
+	return "playing";
+};
 var runInSeries = (tasks) => tasks.reduce((promise, task) => promise.then(task), Promise.resolve());
-var dispatchEvent = (name, element) => {
+var dispatchEvent = (name, element, detail = {}) => {
 	element.dispatchEvent(new CustomEvent(name, {
 		bubbles: true,
-		cancelable: true
+		cancelable: true,
+		detail
 	}));
 };
 var selectElements = (root, selectors, notIn = []) => {
@@ -80,10 +119,22 @@ var restoreElement = ({ element, id, originalHtml }) => {
 	element.classList.remove("dactylo--typing", "dactylo--caret");
 	activeElements.delete(element);
 };
-var step = (started, duration, chars, prepared, output, options) => {
+var resetElementToStart = ({ element, id, original, originalHtml }) => {
+	const currentOriginal = element.querySelector("[data-dactylo-original]") ?? original;
+	currentOriginal.innerHTML = originalHtml;
+	element.replaceChildren(currentOriginal);
+	element.classList.add("dactylo--typing");
+	element.classList.remove("dactylo--caret");
+	activeElements.set(element, {
+		id,
+		originalHtml
+	});
+};
+var step = (started, duration, chars, prepared, output, options, state) => {
 	const active = activeElements.get(prepared.element);
-	if (!active || active.id !== prepared.id) return false;
-	const progress = (Date.now() - started) / duration;
+	if (!active || active.id !== prepared.id || state.stopped) return false;
+	if (state.paused) return true;
+	const progress = (Date.now() - started - state.pausedDuration) / duration;
 	const pointer = progress > 1 ? chars.length : Math.floor(progress * chars.length);
 	output.textContent = chars.slice(0, pointer + 1).join("");
 	output.append(prepared.element.ownerDocument.createElement("wbr"));
@@ -92,7 +143,7 @@ var step = (started, duration, chars, prepared, output, options) => {
 	restoreElement(prepared);
 	return false;
 };
-var typeElement = (prepared, group, options) => new Promise((resolve) => {
+var typeElement = (prepared, group, options, state) => new Promise((resolve) => {
 	const chars = Array.from(prepared.element.innerText);
 	const started = Date.now();
 	const duration = group.interval === void 0 ? group.duration ?? DEFAULT_DURATION : chars.length * group.interval;
@@ -103,7 +154,7 @@ var typeElement = (prepared, group, options) => new Promise((resolve) => {
 	}
 	prepared.element.append(output);
 	const nextStep = () => {
-		if (step(started, duration, chars, prepared, output, options)) {
+		if (step(started, duration, chars, prepared, output, options, state)) {
 			requestAnimationFrame(nextStep);
 			return;
 		}
@@ -111,19 +162,19 @@ var typeElement = (prepared, group, options) => new Promise((resolve) => {
 	};
 	requestAnimationFrame(nextStep);
 });
-var showPrompt = async (first, options) => {
+var showPrompt = async (first, options, state) => {
 	if (!first) return;
 	const prompt = createOutput(first.element.ownerDocument, options.caret);
 	prompt.textContent = options.prompt;
 	first.element.append(prompt);
 	first.element.classList.add("dactylo--caret");
-	await wait(options.startDelay);
-	if (activeElements.get(first.element)?.id !== first.id) return;
+	await wait(options.startDelay, state);
+	if (activeElements.get(first.element)?.id !== first.id || state.stopped) return;
 	prompt.remove();
 	first.element.classList.remove("dactylo--caret");
 };
-var runGroup = (group, root, prepared, options) => {
-	const tasks = selectElements(root, group.sels, group.notIn).map((element) => prepared.get(element)).filter((preparedElement) => preparedElement !== void 0).map((preparedElement) => () => typeElement(preparedElement, group, options));
+var runGroup = (group, root, prepared, options, state) => {
+	const tasks = selectElements(root, group.sels, group.notIn).map((element) => prepared.get(element)).filter((preparedElement) => preparedElement !== void 0).map((preparedElement) => () => typeElement(preparedElement, group, options, state));
 	if (group.parallel) return Promise.all(tasks.map((task) => task()));
 	return runInSeries(tasks);
 };
@@ -212,40 +263,171 @@ var dactylo = (rootOrOptions, maybeOptions = {}) => {
 	const startDelay = options.startDelay ?? DEFAULT_START_DELAY;
 	if (!document || !targetRoot) return {
 		elements: [],
+		end: () => void 0,
 		finished: Promise.resolve(),
+		pause: () => void 0,
+		play: () => void 0,
+		playPause: () => void 0,
 		root: targetRoot,
-		reset: () => void 0
+		reset: () => void 0,
+		state: "stopped",
+		stop: () => void 0
 	};
 	resetDactylo(targetRoot);
 	const selected = groups.flatMap((group) => selectElements(targetRoot, group.sels, group.notIn));
 	const elements = [...new Set(selected)];
 	const prepared = new Map(elements.map((element) => [element, prepareElement(element)]));
 	const runId = ++activeRunId;
+	const playback = createPlaybackState();
+	let delegate = null;
 	injectDactyloStyles(document);
 	document.documentElement.classList.remove("dactylo--end");
 	document.documentElement.classList.add("dactylo--active");
-	dispatchEvent("dactylo:start", document.documentElement);
-	return {
+	const cancel = (eventName) => {
+		if (activeRunId !== runId) return;
+		activeRunId += 1;
+		playback.stopped = true;
+		document.documentElement.classList.remove("dactylo--active");
+		document.documentElement.classList.remove("dactylo--end");
+		for (const preparedElement of prepared.values()) resetElementToStart(preparedElement);
+		dispatchEvent(eventName, document.documentElement, {
+			controller,
+			state: "stopped"
+		});
+	};
+	const end = () => {
+		if (activeRunId !== runId) return;
+		activeRunId += 1;
+		playback.ended = true;
+		playback.paused = false;
+		playback.stopped = false;
+		document.documentElement.classList.remove("dactylo--active");
+		document.documentElement.classList.add("dactylo--end");
+		for (const preparedElement of prepared.values()) restoreElement(preparedElement);
+		dispatchEvent("dactylo:end", document.documentElement, {
+			controller,
+			state: "ended"
+		});
+	};
+	const controller = {
 		elements,
-		finished: runInSeries([() => showPrompt(prepared.values().next().value, {
+		end: () => {
+			if (delegate) {
+				delegate.end();
+				return;
+			}
+			if (playback.ended || playback.stopped) {
+				delegate = dactylo(targetRoot, options);
+				delegate.end();
+				return;
+			}
+			end();
+		},
+		finished: Promise.resolve().then(() => runInSeries([() => showPrompt(prepared.values().next().value, {
 			caret,
 			prompt,
 			startDelay
-		}), ...groups.map((group) => () => runGroup(group, targetRoot, prepared, {
+		}, playback), ...groups.map((group) => () => runGroup(group, targetRoot, prepared, {
 			caret,
 			showFinalCaret
-		}))]).then(() => {
+		}, playback))])).then(() => {
 			if (activeRunId !== runId) return;
+			playback.ended = true;
 			document.documentElement.classList.remove("dactylo--active");
 			document.documentElement.classList.add("dactylo--end");
-			dispatchEvent("dactylo:end", document.documentElement);
+			dispatchEvent("dactylo:end", document.documentElement, {
+				controller,
+				state: "ended"
+			});
 		}),
+		get state() {
+			return delegate?.state ?? getPlaybackState(playback);
+		},
+		pause: () => {
+			if (delegate) {
+				delegate.pause();
+				return;
+			}
+			if (pausePlayback(playback)) dispatchEvent("dactylo:pause", document.documentElement, {
+				controller,
+				state: getPlaybackState(playback)
+			});
+		},
+		play: () => {
+			if (delegate) {
+				delegate.play();
+				return;
+			}
+			if (playback.ended || playback.stopped) {
+				delegate = dactylo(targetRoot, options);
+				return;
+			}
+			if (playPlayback(playback)) dispatchEvent("dactylo:play", document.documentElement, {
+				controller,
+				state: getPlaybackState(playback)
+			});
+		},
+		playPause: () => {
+			if ((delegate?.state ?? getPlaybackState(playback)) === "playing") {
+				if (delegate) {
+					delegate.pause();
+					return;
+				}
+				if (pausePlayback(playback)) dispatchEvent("dactylo:pause", document.documentElement, {
+					controller,
+					state: getPlaybackState(playback)
+				});
+				return;
+			}
+			if (delegate) {
+				delegate.play();
+				return;
+			}
+			if (playback.ended || playback.stopped) {
+				delegate = dactylo(targetRoot, options);
+				return;
+			}
+			if (playPlayback(playback)) dispatchEvent("dactylo:play", document.documentElement, {
+				controller,
+				state: getPlaybackState(playback)
+			});
+		},
 		root: targetRoot,
 		reset: () => {
-			if (activeRunId === runId) activeRunId += 1;
-			resetDactylo(targetRoot);
+			if (delegate) {
+				delegate.reset();
+				return;
+			}
+			if (playback.ended) {
+				delegate = dactylo(targetRoot, options);
+				delegate.reset();
+				return;
+			}
+			cancel("dactylo:reset");
+		},
+		stop: () => {
+			if (delegate) {
+				delegate.stop();
+				return;
+			}
+			if (playback.ended) {
+				delegate = dactylo(targetRoot, options);
+				delegate.stop();
+				return;
+			}
+			pausePlayback(playback);
+			cancel("dactylo:stop");
 		}
 	};
+	dispatchEvent("dactylo:start", document.documentElement, {
+		controller,
+		state: "playing"
+	});
+	dispatchEvent("dactylo:play", document.documentElement, {
+		controller,
+		state: "playing"
+	});
+	return controller;
 };
 //#endregion
 export { dactylo, injectDactyloStyles, resetDactylo };

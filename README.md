@@ -110,12 +110,29 @@ Add `data-dactylo-skip` to any element that should not be processed.
 ```js
 const controller = dactylo(document.body)
 
-await controller.finished
+controller.state
+controller.pause()
+controller.play()
+controller.playPause()
+controller.end()
+controller.stop()
 controller.reset()
+
+await controller.finished
 ```
 
-The `finished` promise resolves after all groups complete. The `reset()` method
-restores any element that is still typing.
+The `finished` promise resolves after all groups complete. The `pause()` and
+`play()` methods control an active run, while `playPause()` toggles between
+them. The `state` property is `playing`, `paused`, `stopped`, or `ended`. The
+`end()` method skips to the completed state. The `reset()` method cancels the
+run and returns controlled elements to their starting state with no typed text
+visible. The `stop()` method pauses first, then resets. Calling `play()` after
+`reset()` or `stop()` starts the same target again.
+
+Dactylo dispatches bubbling custom events on `document.documentElement`:
+`dactylo:start`, `dactylo:play`, `dactylo:pause`, `dactylo:reset`,
+`dactylo:stop`, and `dactylo:end`. Each event includes the controller and
+current state in `event.detail`.
 
 [Back to top](#)
 

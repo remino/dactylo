@@ -10,6 +10,17 @@
 
 ## HEAD
 
+- Site
+    - Add demo controls for controller playback methods.
+    - Use an inline menu list for demo playback controls.
+- Library
+    - Add `state`, `pause()`, `play()`, `playPause()`, `end()`, `reset()`, and
+      `stop()` to Dactylo controllers.
+    - Emit lifecycle and playback events with controller state details.
+    - Make controller `reset()` and `stop()` return text to its hidden starting
+      state instead of restoring the finished text.
+    - Allow `play()` after `reset()` or `stop()` to start the target again.
+
 ## v0.2.0
 
 - Site
