@@ -82,6 +82,8 @@ dactylo({
 - `caret`: character shown after the typed output. Default: `_`.
 - `prompt`: character shown before typing starts. Default: `>`.
 - `root`: parent node to search. Default: `document.body`.
+- `showFinalCaret`: keep the caret visible after the final typed character.
+  Default: `false`.
 - `startDelay`: milliseconds to show the prompt before typing starts. Default:
   `600`.
 - `groups`: selector groups to type. By default, headings run first in parallel,

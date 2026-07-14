@@ -10,6 +10,8 @@
 ## HEAD
 
 - Library
+    - Hide the caret on the final typed character by default, with a
+      `showFinalCaret` option to keep it visible.
     - Prevent quick Dactylo restarts from nesting output fragments or restoring
       stale text.
 - Development

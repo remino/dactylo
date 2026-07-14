@@ -10,6 +10,7 @@ export interface DactyloOptions {
     groups?: DactyloGroup[];
     prompt?: string;
     root?: ParentNode;
+    showFinalCaret?: boolean;
     startDelay?: number;
 }
 export interface DactyloController {

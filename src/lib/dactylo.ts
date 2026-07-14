@@ -20,6 +20,7 @@ const DEFAULT_CARET = '_'
 const DEFAULT_PROMPT = '>'
 const DEFAULT_START_DELAY = 600
 const DEFAULT_DURATION = 500
+const DEFAULT_SHOW_FINAL_CARET = false
 
 export interface DactyloGroup {
 	duration?: number
@@ -34,6 +35,7 @@ export interface DactyloOptions {
 	groups?: DactyloGroup[]
 	prompt?: string
 	root?: ParentNode
+	showFinalCaret?: boolean
 	startDelay?: number
 }
 
@@ -158,7 +160,8 @@ const step = (
 	duration: number,
 	chars: string[],
 	prepared: PreparedElement,
-	output: HTMLElement
+	output: HTMLElement,
+	options: Required<Pick<DactyloOptions, 'showFinalCaret'>>
 ): boolean => {
 	const active = activeElements.get(prepared.element)
 	if (!active || active.id !== prepared.id) return false
@@ -170,6 +173,10 @@ const step = (
 
 	output.textContent = chars.slice(0, pointer + 1).join('')
 	output.append(prepared.element.ownerDocument.createElement('wbr'))
+	output.classList.toggle(
+		'dactylo__output--hide-caret',
+		!options.showFinalCaret && pointer >= chars.length - 1
+	)
 
 	if (pointer < chars.length) return true
 
@@ -180,7 +187,7 @@ const step = (
 const typeElement = (
 	prepared: PreparedElement,
 	group: DactyloGroup,
-	options: Required<Pick<DactyloOptions, 'caret'>>
+	options: Required<Pick<DactyloOptions, 'caret' | 'showFinalCaret'>>
 ): Promise<void> =>
 	new Promise(resolve => {
 		const chars = Array.from(prepared.element.innerText)
@@ -199,7 +206,7 @@ const typeElement = (
 		prepared.element.append(output)
 
 		const nextStep = (): void => {
-			if (step(started, duration, chars, prepared, output)) {
+			if (step(started, duration, chars, prepared, output, options)) {
 				requestAnimationFrame(nextStep)
 				return
 			}
@@ -234,7 +241,7 @@ const runGroup = (
 	group: DactyloGroup,
 	root: ParentNode,
 	prepared: Map<HTMLElement, PreparedElement>,
-	options: Required<Pick<DactyloOptions, 'caret'>>
+	options: Required<Pick<DactyloOptions, 'caret' | 'showFinalCaret'>>
 ): Promise<unknown> => {
 	const tasks = selectElements(root, group.sels, group.notIn)
 		.map(element => prepared.get(element))
@@ -286,6 +293,10 @@ export const injectDactyloStyles = (document = globalThis.document): void => {
 
 		.dactylo--typing.dactylo--caret > .dactylo__output::after {
 			animation: dactylo-caret-blink 1s infinite;
+		}
+
+		.dactylo--typing > .dactylo__output--hide-caret::after {
+			content: "";
 		}
 
 		@media (prefers-reduced-motion: reduce) {
@@ -345,6 +356,7 @@ export const dactylo = (
 	const groups = options.groups ?? DEFAULT_GROUPS
 	const caret = options.caret ?? DEFAULT_CARET
 	const prompt = options.prompt ?? DEFAULT_PROMPT
+	const showFinalCaret = options.showFinalCaret ?? DEFAULT_SHOW_FINAL_CARET
 	const startDelay = options.startDelay ?? DEFAULT_START_DELAY
 
 	if (!document || !targetRoot) {
@@ -376,7 +388,8 @@ export const dactylo = (
 		() =>
 			showPrompt(prepared.values().next().value, { caret, prompt, startDelay }),
 		...groups.map(
-			group => () => runGroup(group, targetRoot, prepared, { caret })
+			group => () =>
+				runGroup(group, targetRoot, prepared, { caret, showFinalCaret })
 		),
 	]).then(() => {
 		if (activeRunId !== runId) return

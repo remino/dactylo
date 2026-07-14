@@ -22,6 +22,7 @@ var DEFAULT_CARET = "_";
 var DEFAULT_PROMPT = ">";
 var DEFAULT_START_DELAY = 600;
 var DEFAULT_DURATION = 500;
+var DEFAULT_SHOW_FINAL_CARET = false;
 var activeElements = /* @__PURE__ */ new WeakMap();
 var nextPreparedId = 0;
 var activeRunId = 0;
@@ -80,13 +81,14 @@ var restoreElement = ({ element, id, originalHtml }) => {
 	element.classList.remove("dactylo--typing", "dactylo--caret");
 	activeElements.delete(element);
 };
-var step = (started, duration, chars, prepared, output) => {
+var step = (started, duration, chars, prepared, output, options) => {
 	const active = activeElements.get(prepared.element);
 	if (!active || active.id !== prepared.id) return false;
 	const progress = (Date.now() - started) / duration;
 	const pointer = progress > 1 ? chars.length : Math.floor(progress * chars.length);
 	output.textContent = chars.slice(0, pointer + 1).join("");
 	output.append(prepared.element.ownerDocument.createElement("wbr"));
+	output.classList.toggle("dactylo__output--hide-caret", !options.showFinalCaret && pointer >= chars.length - 1);
 	if (pointer < chars.length) return true;
 	restoreElement(prepared);
 	return false;
@@ -102,7 +104,7 @@ var typeElement = (prepared, group, options) => new Promise((resolve) => {
 	}
 	prepared.element.append(output);
 	const nextStep = () => {
-		if (step(started, duration, chars, prepared, output)) {
+		if (step(started, duration, chars, prepared, output, options)) {
 			requestAnimationFrame(nextStep);
 			return;
 		}
@@ -168,6 +170,10 @@ var injectDactyloStyles = (document = globalThis.document) => {
 			animation: dactylo-caret-blink 1s infinite;
 		}
 
+		.dactylo--typing > .dactylo__output--hide-caret::after {
+			content: "";
+		}
+
 		@media (prefers-reduced-motion: reduce) {
 			.dactylo--typing > .dactylo__original {
 				opacity: 1;
@@ -200,6 +206,7 @@ var dactylo = (rootOrOptions, maybeOptions = {}) => {
 	const groups = options.groups ?? DEFAULT_GROUPS;
 	const caret = options.caret ?? DEFAULT_CARET;
 	const prompt = options.prompt ?? DEFAULT_PROMPT;
+	const showFinalCaret = options.showFinalCaret ?? DEFAULT_SHOW_FINAL_CARET;
 	const startDelay = options.startDelay ?? DEFAULT_START_DELAY;
 	if (!document || !targetRoot) return {
 		elements: [],
@@ -222,7 +229,10 @@ var dactylo = (rootOrOptions, maybeOptions = {}) => {
 			caret,
 			prompt,
 			startDelay
-		}), ...groups.map((group) => () => runGroup(group, targetRoot, prepared, { caret }))]).then(() => {
+		}), ...groups.map((group) => () => runGroup(group, targetRoot, prepared, {
+			caret,
+			showFinalCaret
+		}))]).then(() => {
 			if (activeRunId !== runId) return;
 			document.documentElement.classList.remove("dactylo--active");
 			document.documentElement.classList.add("dactylo--end");
