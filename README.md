@@ -2,7 +2,7 @@
 
 Typewriter effect in JS using CSS.
 
-Dactylo v0.2.0
+Dactylo v0.3.0
 
 By Rémino Rem  
 <https://remino.net/>

@@ -1,4 +1,4 @@
-/*! dactylo v0.2.0 | (c) 2026 Rémino Rem <https://remino.net/> | ISC Licence */
+/*! dactylo v0.3.0 | (c) 2026 Rémino Rem <https://remino.net/> | ISC Licence */
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 //#region src/lib/dactylo.ts
 var STYLE_ID = "dactylo-style";

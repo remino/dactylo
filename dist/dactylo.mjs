@@ -1,4 +1,4 @@
-/*! dactylo v0.2.0 | (c) 2026 Rémino Rem <https://remino.net/> | ISC Licence */
+/*! dactylo v0.3.0 | (c) 2026 Rémino Rem <https://remino.net/> | ISC Licence */
 //#region src/lib/dactylo.ts
 var STYLE_ID = "dactylo-style";
 var SKIP_SELECTOR = "script,style,noscript,template,textarea,input,select,option,[data-dactylo-skip],[data-dactylo-original],[data-dactylo-output]";
