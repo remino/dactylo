@@ -13,6 +13,7 @@
     - Use the shared copy button helper without local fallback behavior.
     - Wrap Markdown code blocks and add copy buttons to them.
 - Library
+    - Keep typed output aligned with padded elements such as code blocks.
     - Hide the caret on the final typed character by default, with a
       `showFinalCaret` option to keep it visible.
     - Prevent quick Dactylo restarts from nesting output fragments or restoring

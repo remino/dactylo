@@ -154,10 +154,13 @@ var injectDactyloStyles = (document = globalThis.document) => {
 		}
 
 		.dactylo--typing > .dactylo__output {
-			display: inline;
+			box-sizing: border-box;
+			display: block;
 			inset-block-start: 0;
 			inset-inline: 0;
+			padding: inherit;
 			position: absolute;
+			white-space: inherit;
 		}
 
 		.dactylo--typing > .dactylo__output::after {
