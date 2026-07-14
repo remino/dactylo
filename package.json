@@ -22,8 +22,13 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-astro": "^1.7.0",
 		"globals": "^17.7.0",
+		"husky": "^9.1.7",
+		"jasmine": "^6.3.0",
+		"lint-staged": "^16.4.0",
 		"prettier": "^3.7.4",
 		"prettier-plugin-astro": "^0.14.1",
+		"release-it": "^20.2.1",
+		"tsx": "^4.22.4",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.62.0",
 		"vite": "^8.1.0"
@@ -53,6 +58,9 @@
 	"main": "dist/dactylo.cjs",
 	"module": "dist/dactylo.mjs",
 	"name": "dactylo",
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org/"
+	},
 	"scripts": {
 		"build": "npm run js:build && npm run site:assets && astro build",
 		"dev": "astro dev",
@@ -67,13 +75,54 @@
 		"lib:build": "npm run js:build",
 		"lint": "eslint --fix .",
 		"lint:check": "eslint .",
+		"precommit": "lint-staged",
+		"prepare": "husky",
 		"preview": "astro preview",
+		"release": "release-it",
+		"release:dry-run": "release-it --dry-run --verbose",
 		"site:assets": "true",
 		"start": "npm run dev",
-		"typecheck": "astro check && tsc --noEmit",
-		"version": "npm run build && git add dist"
+		"test": "tsx ./node_modules/jasmine/bin/jasmine.js",
+		"typecheck": "astro check && tsc --noEmit"
 	},
 	"type": "module",
 	"types": "dist/dactylo.d.ts",
+	"lint-staged": {
+		"*.{js,mjs,cjs,ts,astro}": [
+			"prettier --write",
+			"eslint --fix"
+		],
+		"*.{css,md,json,yml,yaml}": "prettier --write"
+	},
+	"release-it": {
+		"git": {
+			"commitMessage": "Release v${version}",
+			"tagName": "v${version}"
+		},
+		"github": {
+			"assets": [
+				"dist/*"
+			],
+			"release": true
+		},
+		"hooks": {
+			"before:init": [
+				"npm run lint:check",
+				"npm run typecheck",
+				"npm test",
+				"npm run build"
+			],
+			"after:bump": [
+				"node bin/release-changelog.mjs promote ${version}",
+				"node bin/release-readme.mjs update ${version}",
+				"npm run build",
+				"git add CHANGELOG.md README.md package.json package-lock.json dist"
+			],
+			"after:release": "npm run docs:publish"
+		},
+		"npm": {
+			"publish": true
+		}
+	},
 	"version": "0.1.0"
 }
