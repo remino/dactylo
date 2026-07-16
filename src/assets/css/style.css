@@ -16,6 +16,15 @@
 	src: url('/fonts/IosevkaTerm-Bold.woff2') format('woff2');
 }
 
+@keyframes caret-blink {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
 :root {
 	--dactylo-ff:
 		'Iosevka Term', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -67,6 +76,17 @@ main {
 article mark,
 header h1 {
 	text-transform: lowercase;
+}
+
+.dactylo--end {
+	header h1::after {
+		display: inline;
+		content: '_';
+
+		@media (prefers-reduced-motion: no-preference) {
+			animation: caret-blink 2s steps(2, jump-none) infinite;
+		}
+	}
 }
 
 .demo-controls {
